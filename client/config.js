@@ -7,7 +7,5 @@
   , remoteAddr: 'example.com'
   , remoteWebPort: 8080
   , localPort: 5050
-  , username: 'coolaj86'
-  , password: 'bananas'
   };
 }());
