@@ -85,7 +85,7 @@
 
   superServer.listen(function () {
     superPort = superServer.address().port;
-    http.createServer(app).listen(9090, function () {
+    http.createServer(app).listen(config.localWebPort, function () {
       console.log(this.address().port, superPort);
     });
   });
