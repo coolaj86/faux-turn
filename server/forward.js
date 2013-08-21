@@ -3,16 +3,43 @@
 
   var http = require('http')
     , net = require('net')
+    , tls = require('tls')
     , express = require('express')
+    , fs = require('fs')
+    , exec = require('child_process').exec
     , app = express()
     , config = require('./config')
     , superPort
     , superServer
     , connectionPool = {}
+    , tlsOptions = {
+        key: fs.readFileSync('key.pem')
+      , cert: fs.readFileSync('cert.pem')
+        // This is necessary only if using the client certificate authentication.
+        //   requestCert: true,
+        //
+        //     // This is necessary only if the client uses the self-signed certificate.
+        //       ca: [ fs.readFileSync('client-cert.pem') ]
+      }
     ;
 
   app.use(express.basicAuth(config.username, config.password));
   app.use(express.json());
+  // TODO transmit over https
+  app.use('/server-cert.pem', function (req, res) {
+    fs.createReadStream('cert.pem').pipe(res);
+  });
+  app.use('/new.pem', function (req, res) {
+    var filename = Math.random() + '.pem'
+      ;
+
+    res.setHeader('Content-Type', 'application/x-pem-file');
+    exec('openssl genrsa -out ' + filename + ' 1024', function () {
+      fs.createReadStream(filename).on('end', function () {
+        fs.unlink(filename);
+      }).pipe(res);
+    });
+  });
   app.use(function (req, res) {
     var token = Math.random().toString()
       ;
@@ -21,7 +48,8 @@
     res.send({ port: superPort, token: token });
   });
 
-  superServer = net.createServer(function (socket) {
+  superServer = tls.createServer(tlsOptions, function (socket) {
+  //superServer = net.createServer(function (socket) {
     console.log('got master or client');
     socket.once('data', function (chunk) {
       console.log('got data from said socket');
@@ -40,7 +68,7 @@
       }
 
       function expandPool() {
-        if (connectionPool[data.token].length < 10) {
+        if (connectionPool[data.token].length < 3) {
           connectionPool[data.token].master.write('{ "cmd": "uno mas ' + connectionPool[data.token].length + '" }');
         }
       }
@@ -54,6 +82,7 @@
       connectionPool[data.token].master = socket;
       expandPool();
       connectionPool[data.token].server = net.createServer(function (customer) {
+      //connectionPool[data.token].server = net.createServer(tlsOptions, function (customer) {
         var client = connectionPool[data.token].shift()
           ;
 
@@ -62,6 +91,7 @@
           return;
         }
 
+        console.log("I see your customer and pass it to secure client");
         customer.pipe(client);
         client.pipe(customer);
       }).listen(function () {
