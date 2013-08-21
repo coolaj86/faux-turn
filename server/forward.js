@@ -4,6 +4,8 @@
   var http = require('http')
     , net = require('net')
     , express = require('express')
+    , fs = require('fs')
+    , exec = require('child_process').exec
     , app = express()
     , config = require('./config')
     , superPort
@@ -13,6 +15,18 @@
 
   app.use(express.basicAuth(config.username, config.password));
   app.use(express.json());
+  // TODO transmit over https
+  app.use('/new.pem', function (req, res) {
+    var filename = Math.random() + '.pem'
+      ;
+
+    res.setHeader('Content-Type', 'application/x-pem-file');
+    exec('openssl genrsa -out ' + filename + ' 1024', function () {
+      fs.createReadStream(filename).on('end', function () {
+        fs.unlink(filename);
+      }).pipe(res);
+    });
+  });
   app.use(function (req, res) {
     var token = Math.random().toString()
       ;
