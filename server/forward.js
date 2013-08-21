@@ -40,7 +40,7 @@
       }
 
       function expandPool() {
-        if (connectionPool[data.token].length < 10) {
+        if (connectionPool[data.token].length < 3) {
           connectionPool[data.token].master.write('{ "cmd": "uno mas ' + connectionPool[data.token].length + '" }');
         }
       }
