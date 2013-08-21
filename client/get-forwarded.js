@@ -14,11 +14,9 @@
       ;
 
     remotePort = data.port;
-    console.log(remoteUrl, data);
 
     socket = net.connect(remotePort, config.remoteAddr);
     socket.on('connect', function () {
-      console.log('connected');
       socket.write('{ "master": true, "token": "' + data.token + '"}');
     });
     socket.on('data', function (chunk) {
@@ -33,12 +31,11 @@
         data = {};
       }
 
-      console.log(data);
-
       if (!data.cmd) {
+        console.log('http://' + config.remoteAddr + ':' + data.port);
         return;
       }
-      console.log(chunk.toString('utf8'));
+
       customer = net.connect(remotePort, config.remoteAddr);
       customer.on('connect', function () {
         customer.write('{ "token": "' + token + '" }');
