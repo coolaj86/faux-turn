@@ -10,7 +10,7 @@
     , config = require('./config')
     , superPort
     , superServer
-    , connectionPool = {}
+    , customerPools = {}
     ;
 
   app.use(express.basicAuth(config.username, config.password));
@@ -31,72 +31,79 @@
     var token = Math.random().toString()
       ;
 
-    connectionPool[token] = [];
     res.send({ port: superPort, token: token });
   });
 
   superServer = net.createServer(function (socket) {
+    var master
+      ;
+
     console.log('[*] new socket from behind the NAT');
     socket.once('data', function (chunk) {
       console.log('[D] got data from socket');
       var data
+        , customer
         ;
 
       try {
         data = JSON.parse(chunk.toString('utf8'));
       } catch (e) {
         data = {};
+        socket.end("422 didn't pick up what you were putting down");
       }
 
-      if (!connectionPool[data.token] /*|| master.connection.remoteAddr !== connectionPool[token].remoteAddr*/) {
-        socket.end('500 expected master connection');
-        return;
-      }
-
-      function expandPool() {
-        if (connectionPool[data.token].length < 3) {
-          connectionPool[data.token].master.write('{ "cmd": "uno mas ' + connectionPool[data.token].length + '" }');
-        }
-      }
-
+      // If this is a slave
       if (!data.master) {
-        console.log('[S] socket is a slave');
-        expandPool();
-        connectionPool[data.token].push(socket);
-        return;
-      }
-      console.log('[MASTER] socket is a master');
 
-      connectionPool[data.token].master = socket;
-      expandPool();
-      connectionPool[data.token].server = net.createServer(function (customer) {
-        var client = connectionPool[data.token].shift()
-          ;
-
-        expandPool();
-
-        if (!client) {
-          customer.end('500 server temporarily unavailable');
-          return;
+        // shouldn't be getting NAT device slaves before getting the master
+        if (!customerPools[data.token]) {
+          console.log('no customer pool');
+          socket.end('500 expecting master');
         }
 
-        customer.pipe(client);
-        client.pipe(customer);
+        console.log('[S] socket is a slave');
+        customer = customerPools[data.token].shift();
+        if (!customer) {
+          socket.end();
+        }
+        socket.setKeepAlive(true);
+        socket.pipe(customer);
+        customer.setKeepAlive(true);
+        customer.pipe(socket);
+        // TODO activeSessions.push({ slave: socket, customer: customer });
+        return;
+      }
+
+      // Duplicate master?
+      if (customerPools[data.token]) {
+        console.log("Odd... there was already a master for this pool; it shouldn't exist");
+        socket.end('400 a master already exists');
+        return;
+      }
+
+      // This is a master
+      console.log('[MASTER] socket is a master');
+      master = socket;
+      master.setKeepAlive(true);
+      customerPools[data.token] = [];
+
+      net.createServer(function (customer) {
+        customerPools[data.token].push(customer);
+        master.write('{ "cmd": "uno mas" }');
       }).listen(function () {
         var port = this.address().port.toString()
           ;
 
         console.log('port', port);
-        socket.write('{ "port": "' + port + '" }');
+        master.write('{ "port": "' + port + '" }');
       });
 
-      socket.on('close', function () {
-        // TODO force release the pool and close the server error
-        connectionPool[data.token].server.close();
-        connectionPool[data.token].forEach(function (client) {
-          client.end();
+      master.on('close', function () {
+        console.log('master closed, slaves should die too');
+        customerPools[data.token].forEach(function (customer) {
+          customer.end();
         });
-        delete connectionPool[data.token];
+        delete customerPools[data.token];
       });
     });
   });
