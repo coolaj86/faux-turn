@@ -1,7 +1,9 @@
 faux-turn
 =========
 
-A simple NAT-traversing port-forwarding service (hence faux TURN) built with NodeJS
+A poor-man's TURN server built with NodeJS
+
+Although not a true TURN server, it does allow you to port-forward and NAT-traverse.
 
 Say you have a beta web app you're developing on your laptop (on port 4040) and you
 want to share it with a friend over google hangout.
