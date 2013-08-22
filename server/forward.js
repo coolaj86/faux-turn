@@ -36,9 +36,9 @@
   });
 
   superServer = net.createServer(function (socket) {
-    console.log('got master or client');
+    console.log('[*] new socket from behind the NAT');
     socket.once('data', function (chunk) {
-      console.log('got data from said socket');
+      console.log('[D] got data from socket');
       var data
         ;
 
@@ -60,16 +60,20 @@
       }
 
       if (!data.master) {
+        console.log('[S] socket is a slave');
         expandPool();
         connectionPool[data.token].push(socket);
         return;
       }
+      console.log('[MASTER] socket is a master');
 
       connectionPool[data.token].master = socket;
       expandPool();
       connectionPool[data.token].server = net.createServer(function (customer) {
         var client = connectionPool[data.token].shift()
           ;
+
+        expandPool();
 
         if (!client) {
           customer.end('500 server temporarily unavailable');
