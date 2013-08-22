@@ -9,40 +9,54 @@
     ;
 
   ahr.http(remoteUrl, { username: config.username, password: config.password }).when(function (err, ahr, data) {
-    var socket
+    var master
       , token = data.token
       ;
 
     remotePort = data.port;
 
-    socket = net.connect(remotePort, config.remoteAddr);
-    socket.on('connect', function () {
-      socket.write('{ "master": true, "token": "' + data.token + '"}');
+    master = net.connect(remotePort, config.remoteAddr);
+    master.on('connect', function () {
+      master.write('{ "master": true, "token": "' + data.token + '"}');
     });
-    socket.on('data', function (chunk) {
+    master.on('data', function (chunk) {
       var customer
-        , server
-        , data
+        , json
         ;
 
       try {
-        data = JSON.parse(chunk.toString('utf8'));
+        json = JSON.parse(chunk.toString('utf8'));
       } catch(e) {
-        data = {};
+        json = {};
       }
 
-      if (!data.cmd) {
-        console.log('http://' + config.remoteAddr + ':' + data.port);
+      if (!json.cmd) {
+        console.log('http://' + config.remoteAddr + ':' + json.port);
+        if (!json.port) {
+          console.log('badness', json, chunk.toString('utf8'));
+        }
         return;
       }
 
       customer = net.connect(remotePort, config.remoteAddr);
       customer.on('connect', function () {
+        var localServer
+          ;
+
         customer.write('{ "token": "' + token + '" }');
-        server = net.connect(config.localPort, 'localhost');
-        customer.pipe(server);
-        server.pipe(customer);
+        localServer = net.connect(config.localPort, 'localhost');
+        customer.pipe(localServer);
+        localServer.pipe(customer);
+        customer.on('end', function () {
+          console.log('customer disconnected');
+        });
+        localServer.on('end', function () {
+          console.log('slave disconnected');
+        });
       });
+    });
+    master.on('end', function () {
+      console.log("[END] and that's that");
     });
   });
 }());
