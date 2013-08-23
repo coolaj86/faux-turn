@@ -29,6 +29,7 @@ Installation (on Laptop at home)
     git clone https://github.com/coolaj86/faux-turn.git
     pushd faux-turn/client
     # edit password in config.js
+    npm install ahr@3.x
     node get-forwarded
 
 Note the `http://example.com:port` address that is output, that's the link you'll want to share.
