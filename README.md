@@ -1,7 +1,7 @@
 faux-turn
 =========
 
-A poor-man's TURN server built with NodeJS
+A poor-man's TURN server built with NodeJS (basically ProxyLocal, but in JavaScript, as it should be)
 
 Although not a true TURN server, it does allow you to port-forward and NAT-traverse.
 
